@@ -1,0 +1,77 @@
+version: '3.8'
+x-common:
+  database:
+    &db-envoirnment
+    # do not remove &db-password, it is used in panel
+    MYSQL_ROOT_PASSWORD: &db-password "root"
+    MYSQL_PASSWORD: "password"
+  panel:
+    &panel-environment
+    APP_URL: "https://panel.example.com"
+    # List of valid timezone can be found here https://www.php.net/manual/en/timezones.php
+    APP_TIMEZONE: "UTC"
+    APP_SERVICE_AUTHOR: "noreply@example.com"
+    TRUSTED_PROXIES: "*"
+  mail:
+    &mail-environment
+    MAIL_DRIVER: "smtp"
+    MAIL_FROM: "noreply@example.com"
+    MAIL_HOST: "mail.example.com"
+    MAIL_PORT: "587"
+    MAIL_USERNAME: ""
+    MAIL_PASSWORD: ""
+    MAIL_ENCRYPTION: "true"
+
+#
+# ------------------------------
+# DANGER ZONE
+# ------------------------------
+#
+# Do not edit anything below this line unless you know what you are doing.
+#
+
+services:
+  database:
+    image: mariadb:10.5
+    restart: always
+    command: --default-authentication-plugin=mysql_native_password
+    volumes:
+      - /srv/pterodactyl/database:/var/lib/mysql
+    environment:
+      <<: *db-envoirnment
+      MYSQL_DATABASE: "panel"
+      MYSQL_USER: "pterodactyl"
+  cache:
+    image: redis:alpine
+    restart: always
+  panel:
+    image: ghcr.io/pterodactyl/panel:latest
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "/srv/pterodactyl/var/:/app/var/"
+      - "/srv/pterodactyl/nginx/:/etc/nginx/http.d/"
+      - "/srv/pterodactyl/certs/:/etc/letsencrypt/"
+      - "/srv/pterodactyl/logs/:/app/storage/logs"
+    enviornment:
+      <<: [*panel-environment, *mail-environment]
+      DB_PASSWORD: *db-password
+      APP_ENV: "production"
+      APP_ENVIRONMENT_ONLY: "false"
+      CACHE_DRIVER: "redis"
+      SESSION_DRIVER: "redis"
+      QUEUE_DRIVER: "redis"
+      REDIS_HOST: "cache"
+      DB_HOST: "database"
+      DB_PORT: "3306"
+      
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+
+
